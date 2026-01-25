@@ -353,6 +353,61 @@
             color: #00aaff;
             text-decoration: none;
         }
+
+        /* Backend Status Styles */
+        .status-grid {
+            display: grid;
+            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        }
+
+        .status-item {
+            background: rgba(10, 10, 15, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .status-item .label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .status-item .value {
+            color: #00ff88;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.healthy {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+
+        .status-badge.initializing {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+            border: 1px solid #ffaa00;
+        }
+
+        .status-badge.error {
+            background: rgba(255, 50, 50, 0.2);
+            color: #ff3232;
+            border: 1px solid #ff3232;
+        }
     </style>
 </head>
 <body>
@@ -426,6 +481,14 @@
                         <audio id="audioPlayer" controls></audio>
                     </div>
                 </form>
+            </section>
+
+            <!-- Backend Status Card -->
+            <section class="card">
+                <h2>Backend Status</h2>
+                <div id="backendStatus">
+                    <p style="color: #666;">Loading backend information...</p>
+                </div>
             </section>
 
             <!-- Quick Links -->
@@ -583,8 +646,67 @@ response.<span class="function">stream_to_file</span>(<span class="string">"outp
             }
         }
 
-        // Load voices on page load
+        // Load backend status
+        async function loadBackendStatus() {
+            const statusContainer = document.getElementById('backendStatus');
+            try {
+                const response = await fetch('/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Determine status badge class
+                    let statusClass = 'error';
+                    if (data.status === 'healthy') statusClass = 'healthy';
+                    else if (data.status === 'initializing') statusClass = 'initializing';
+                    
+                    // Build status HTML
+                    let html = `
+                        <div class="status-grid">
+                            <div class="status-item">
+                                <div class="label">Status</div>
+                                <div class="value">
+                                    <span class="status-badge ${statusClass}">${data.status}</span>
+                                </div>
+                            </div>
+                            <div class="status-item">
+                                <div class="label">Backend</div>
+                                <div class="value">${data.backend?.name || 'unknown'}</div>
+                            </div>
+                            <div class="status-item">
+                                <div class="label">Model</div>
+                                <div class="value" style="font-size: 12px;">${data.backend?.model_id || 'N/A'}</div>
+                            </div>
+                            <div class="status-item">
+                                <div class="label">Device</div>
+                                <div class="value">${data.device?.type || 'unknown'}</div>
+                            </div>`;
+                    
+                    if (data.device?.gpu_available) {
+                        html += `
+                            <div class="status-item">
+                                <div class="label">GPU</div>
+                                <div class="value" style="font-size: 12px;">${data.device.gpu_name || 'N/A'}</div>
+                            </div>
+                            <div class="status-item">
+                                <div class="label">VRAM</div>
+                                <div class="value">${data.device.vram_total || 'N/A'}</div>
+                            </div>`;
+                    }
+                    
+                    html += `</div>`;
+                    statusContainer.innerHTML = html;
+                } else {
+                    statusContainer.innerHTML = '<p style="color: #ff3232;">Failed to load backend status</p>';
+                }
+            } catch (error) {
+                console.error('Error loading backend status:', error);
+                statusContainer.innerHTML = '<p style="color: #ff3232;">Error: ' + error.message + '</p>';
+            }
+        }
+
+        // Load voices and backend status on page load
         loadVoices();
+        loadBackendStatus();
     </script>
 </body>
 </html>

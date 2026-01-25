@@ -18,6 +18,7 @@ This repository provides an **OpenAI-compatible FastAPI server** for **Qwen3-TTS
 ## ✨ Features
 
 - 🎯 **OpenAI API Compatible** - Drop-in replacement for `POST /v1/audio/speech`
+- ⚡ **Multiple Backends** - Choose between official or vLLM-Omni backend for optimal performance
 - 🌐 **Multi-language Support** - 10+ languages (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian)
 - 🎨 **Multiple Voice Options** - 9 premium voices with various gender, age, and dialect combinations
 - 📊 **Multiple Audio Formats** - MP3, Opus, AAC, FLAC, WAV, PCM
@@ -25,6 +26,18 @@ This repository provides an **OpenAI-compatible FastAPI server** for **Qwen3-TTS
 - 🔧 **Text Sanitization** - Advanced text preprocessing for URLs, emails, special characters
 - 🐳 **Docker Ready** - Multi-stage Dockerfile with GPU and CPU variants
 - 🖥️ **Web Interface** - Dark-themed interactive demo UI
+
+### Backend Options
+
+This implementation supports two backend engines:
+
+| Backend | Speed | Setup | Best For |
+|---------|-------|-------|----------|
+| **Official** (default) | ⚡⚡ Medium | ✅ Simple | Maximum quality, standard use |
+| **vLLM-Omni** | ⚡⚡⚡ Fast | ⚠️ Requires vLLM | High-throughput, low-latency scenarios |
+
+- **Official Backend**: Uses the official Qwen3-TTS Python implementation. Recommended for most users.
+- **vLLM-Omni Backend**: Uses vLLM for optimized inference. Requires additional setup but provides faster generation. See [docs/vllm-backend.md](docs/vllm-backend.md) for details.
 
 ## 🚀 Performance Benchmarks
 
@@ -145,8 +158,29 @@ The server will start on `http://0.0.0.0:8880` by default.
 - `PORT` - Server port (default: `8880`)
 - `WORKERS` - Number of workers (default: `1`)
 - `CORS_ORIGINS` - CORS origins (default: `*`)
+- `TTS_BACKEND` - Backend engine: `official` or `vllm_omni` (default: `official`)
+- `TTS_MODEL_NAME` - Override default model (optional)
+- `TTS_WARMUP_ON_START` - Warmup on startup: `true` or `false` (default: `false`)
+
+**Backend Selection:**
+
+```bash
+# Use official backend (default)
+export TTS_BACKEND=official
+python -m api.main
+
+# Use vLLM-Omni backend for faster inference
+export TTS_BACKEND=vllm_omni
+export TTS_WARMUP_ON_START=true
+pip install -e ".[vllm]"  # Install vLLM first
+python -m api.main
+```
+
+For detailed vLLM-Omni setup and configuration, see [docs/vllm-backend.md](docs/vllm-backend.md).
 
 ### Option 2: Using Docker (GPU-Enabled)
+
+**Official Backend (Default):**
 
 ```bash
 # Build and run with GPU support
@@ -155,6 +189,20 @@ docker run --gpus all -p 8880:8880 qwen3-tts-api
 
 # Or use Docker Compose for easier management
 docker-compose up qwen3-tts-gpu
+```
+
+**vLLM-Omni Backend (Faster):**
+
+```bash
+# Build vLLM-enabled image
+docker build -t qwen3-tts-api:vllm --target vllm-production .
+docker run --gpus all -p 8880:8880 \
+  -e TTS_BACKEND=vllm_omni \
+  -e TTS_WARMUP_ON_START=true \
+  qwen3-tts-api:vllm
+
+# Or use Docker Compose
+docker-compose --profile vllm up qwen3-tts-vllm
 ```
 
 ### Option 3: Using Docker (CPU-Only)
@@ -170,11 +218,14 @@ docker-compose --profile cpu up qwen3-tts-cpu
 
 ### Docker Compose Configuration
 
-The `docker-compose.yml` includes both GPU and CPU configurations:
+The `docker-compose.yml` includes GPU and CPU configurations with both backends:
 
 ```bash
-# GPU-enabled (default)
+# Official backend with GPU (default)
 docker-compose up qwen3-tts-gpu
+
+# vLLM-Omni backend with GPU (faster)
+docker-compose --profile vllm up qwen3-tts-vllm
 
 # CPU-only (uses profile)
 docker-compose --profile cpu up qwen3-tts-cpu
@@ -196,6 +247,7 @@ docker-compose down
 - `POST /v1/audio/speech` - Generate speech (OpenAI-compatible)
 - `GET /v1/models` - List available models
 - `GET /v1/voices` - List available voices
+- `GET /health` - Health check with backend status
 - `GET /docs` - Swagger UI documentation
 - `GET /redoc` - ReDoc documentation
 - `GET /health` - Health check endpoint
