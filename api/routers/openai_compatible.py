@@ -8,6 +8,7 @@ Implements endpoints compatible with OpenAI's TTS API specification.
 import base64
 import io
 import logging
+import os
 import time
 from typing import List, Optional
 
@@ -320,11 +321,23 @@ async def list_voices():
         VoiceInfo(id="onyx", name="Onyx", description="OpenAI-compatible voice (maps to Evan)"),
         VoiceInfo(id="shimmer", name="Shimmer", description="OpenAI-compatible voice (maps to Lily)"),
     ]
+
+    custom_voice_path = os.getenv("CUSTOM_VOICE")
+    custom_voice = None
+    if custom_voice_path:
+        custom_voice = VoiceInfo(
+            id="custom",
+            name="Custom",
+            description=f"Custom voice clone prompt loaded from {custom_voice_path}",
+        )
     
     default_languages = ["English", "Chinese", "Japanese", "Korean", "German", "French", "Spanish", "Russian", "Portuguese", "Italian"]
     
     try:
         backend = await get_tts_backend()
+
+        if custom_voice and not backend.supports_voice_cloning():
+            custom_voice = None
         
         # Get supported speakers from the backend
         speakers = backend.get_supported_voices()
@@ -345,6 +358,9 @@ async def list_voices():
                 voices.append(voice_info.model_dump())
         else:
             voices = [v.model_dump() for v in default_voices]
+
+        if custom_voice and not any(v["id"].lower() == "custom" for v in voices):
+            voices.append(custom_voice.model_dump())
         
         return {
             "voices": voices + [v.model_dump() for v in openai_voices],
@@ -354,8 +370,12 @@ async def list_voices():
     except Exception as e:
         logger.warning(f"Could not get voices from backend: {e}")
         # Return default voices if backend is not loaded
+        fallback_voices = [v.model_dump() for v in default_voices]
+        if custom_voice and not any(v["id"].lower() == "custom" for v in fallback_voices):
+            fallback_voices.append(custom_voice.model_dump())
+
         return {
-            "voices": [v.model_dump() for v in default_voices] + [v.model_dump() for v in openai_voices],
+            "voices": fallback_voices + [v.model_dump() for v in openai_voices],
             "languages": default_languages,
         }
 

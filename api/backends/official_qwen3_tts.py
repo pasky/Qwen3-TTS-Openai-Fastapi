@@ -8,6 +8,8 @@ from the qwen_tts package.
 """
 
 import logging
+import os
+import pickle
 from typing import Optional, Tuple, List, Dict, Any
 import numpy as np
 
@@ -36,6 +38,8 @@ class OfficialQwen3TTSBackend(TTSBackend):
         super().__init__()
         self.model_name = model_name
         self._ready = False
+        self.custom_voice_path = os.getenv("CUSTOM_VOICE")
+        self.custom_voice_prompt = None
     
     async def initialize(self) -> None:
         """Initialize the backend and load the model."""
@@ -126,6 +130,14 @@ class OfficialQwen3TTSBackend(TTSBackend):
                 torch.backends.cudnn.allow_tf32 = True
                 logger.info("Enabled TF32 precision for faster matmul")
             
+            if self.custom_voice_path:
+                if not self.supports_voice_cloning():
+                    raise RuntimeError(
+                        "CUSTOM_VOICE requires the Base model (Qwen3-TTS-12Hz-1.7B-Base). "
+                        "Set TTS_MODEL_NAME accordingly."
+                    )
+                self._load_custom_voice_prompt()
+
             self._ready = True
             logger.info(f"Official Qwen3-TTS backend loaded successfully on {self.device}")
             
@@ -133,6 +145,32 @@ class OfficialQwen3TTSBackend(TTSBackend):
             logger.error(f"Failed to load official TTS backend: {e}")
             raise RuntimeError(f"Failed to initialize official TTS backend: {e}")
     
+    def _load_custom_voice_prompt(self) -> Optional[List[Any]]:
+        if not self.custom_voice_path:
+            return None
+        if self.custom_voice_prompt is not None:
+            return self.custom_voice_prompt
+
+        custom_voice_path = os.path.expanduser(self.custom_voice_path)
+        if not os.path.isfile(custom_voice_path):
+            raise RuntimeError(f"CUSTOM_VOICE file not found: {custom_voice_path}")
+
+        try:
+            with open(custom_voice_path, "rb") as handle:
+                prompt_items = pickle.load(handle)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load CUSTOM_VOICE prompt: {e}")
+
+        if isinstance(prompt_items, dict) and "items" in prompt_items:
+            prompt_items = prompt_items["items"]
+
+        if not isinstance(prompt_items, list) or not prompt_items:
+            raise RuntimeError("CUSTOM_VOICE prompt must be a non-empty list")
+
+        self.custom_voice_prompt = prompt_items
+        logger.info(f"Loaded CUSTOM_VOICE prompt from {custom_voice_path}")
+        return self.custom_voice_prompt
+
     async def generate_speech(
         self,
         text: str,
@@ -158,13 +196,27 @@ class OfficialQwen3TTSBackend(TTSBackend):
             await self.initialize()
         
         try:
-            # Generate speech
-            wavs, sr = self.model.generate_custom_voice(
-                text=text,
-                language=language,
-                speaker=voice,
-                instruct=instruct,
-            )
+            voice_key = voice.lower()
+            if voice_key == "custom":
+                if not self.supports_voice_cloning():
+                    raise RuntimeError(
+                        "CUSTOM_VOICE requires the Base model (Qwen3-TTS-12Hz-1.7B-Base). "
+                        "Set TTS_MODEL_NAME accordingly."
+                    )
+                prompt_items = self._load_custom_voice_prompt()
+                wavs, sr = self.model.generate_voice_clone(
+                    text=text,
+                    language=language,
+                    voice_clone_prompt=prompt_items,
+                )
+            else:
+                # Generate speech
+                wavs, sr = self.model.generate_custom_voice(
+                    text=text,
+                    language=language,
+                    speaker=voice,
+                    instruct=instruct,
+                )
             
             audio = wavs[0]
             
@@ -192,18 +244,27 @@ class OfficialQwen3TTSBackend(TTSBackend):
         """Return list of supported voice names."""
         if not self._ready or not self.model:
             # Return default voices when model is not loaded
-            return ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
+            voices = ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
+            if self.custom_voice_path:
+                voices.append("custom")
+            return voices
         
         try:
             if hasattr(self.model.model, 'get_supported_speakers'):
                 speakers = self.model.model.get_supported_speakers()
                 if speakers:
-                    return list(speakers)
+                    voice_list = list(speakers)
+                    if self.custom_voice_path and "custom" not in [v.lower() for v in voice_list]:
+                        voice_list.append("custom")
+                    return voice_list
         except Exception as e:
             logger.warning(f"Could not get speakers from model: {e}")
         
         # Fallback to default voices
-        return ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
+        voices = ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
+        if self.custom_voice_path:
+            voices.append("custom")
+        return voices
     
     def get_supported_languages(self) -> List[str]:
         """Return list of supported language names."""
