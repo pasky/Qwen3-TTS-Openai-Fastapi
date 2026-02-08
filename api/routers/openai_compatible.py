@@ -357,7 +357,7 @@ async def list_voices():
                 )
                 voices.append(voice_info.model_dump())
         else:
-            voices = [v.model_dump() for v in default_voices]
+            voices = [] if backend.supports_voice_cloning() else [v.model_dump() for v in default_voices]
 
         if custom_voice and not any(v["id"].lower() == "custom" for v in voices):
             voices.append(custom_voice.model_dump())

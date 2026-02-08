@@ -210,6 +210,11 @@ class OfficialQwen3TTSBackend(TTSBackend):
                     voice_clone_prompt=prompt_items,
                 )
             else:
+                if self.supports_voice_cloning():
+                    raise RuntimeError(
+                        "Base model does not support generate_custom_voice. "
+                        "Use voice='custom' with CUSTOM_VOICE or switch to a CustomVoice model."
+                    )
                 # Generate speech
                 wavs, sr = self.model.generate_custom_voice(
                     text=text,
@@ -244,12 +249,16 @@ class OfficialQwen3TTSBackend(TTSBackend):
         """Return list of supported voice names."""
         if not self._ready or not self.model:
             # Return default voices when model is not loaded
+            if self.supports_voice_cloning():
+                return ["custom"] if self.custom_voice_path else []
             voices = ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
             if self.custom_voice_path:
                 voices.append("custom")
             return voices
         
         try:
+            if self.supports_voice_cloning():
+                return ["custom"] if self.custom_voice_path else []
             if hasattr(self.model.model, 'get_supported_speakers'):
                 speakers = self.model.model.get_supported_speakers()
                 if speakers:
@@ -261,6 +270,8 @@ class OfficialQwen3TTSBackend(TTSBackend):
             logger.warning(f"Could not get speakers from model: {e}")
         
         # Fallback to default voices
+        if self.supports_voice_cloning():
+            return ["custom"] if self.custom_voice_path else []
         voices = ["Vivian", "Ryan", "Sophia", "Isabella", "Evan", "Lily"]
         if self.custom_voice_path:
             voices.append("custom")
