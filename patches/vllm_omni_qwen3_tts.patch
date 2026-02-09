@@ -1,0 +1,60 @@
+--- vllm_omni/model_executor/models/qwen3_tts/qwen3_tts.py	2026-02-09 20:12:30.172224109 +0100
++++ vllm_omni/model_executor/models/qwen3_tts/qwen3_tts.py	2026-02-09 20:13:51.260602259 +0100
+@@ -115,6 +115,8 @@
+         runtime_additional_information = kwargs.get("runtime_additional_information", [{}])
+         if isinstance(runtime_additional_information, list) and len(runtime_additional_information) > 0:
+             runtime_additional_information = runtime_additional_information[0]
++        # Shallow copy so .pop() never mutates the shared per-request dict.
++        runtime_additional_information = dict(runtime_additional_information)
+         text = runtime_additional_information.pop("text", [""])[0]
+         # Extract task_type from kwargs, default to "instruct"
+         task_type = runtime_additional_information.pop("task_type", [self.task_type])[0]
+@@ -780,6 +782,48 @@
+                 "does not support generate_voice_clone, Please check Model Card or Readme for more details."
+             )
+ 
++        # ------------------------------------------------------------------
++        # Support flattened voice-clone keys from vLLM-Omni IPC.
++        #
++        # When the API server passes CUSTOM_VOICE data through
++        # additional_information, torch tensors are sent as top-level
++        # entries (because msgpack cannot serialise nested tensors).
++        # Reconstruct a VoiceClonePromptItem from those entries here.
++        # ------------------------------------------------------------------
++        vc_spk = kwargs.pop("voice_clone_ref_spk_embedding", None)
++        if vc_spk is not None and voice_clone_prompt is None:
++            vc_code = kwargs.pop("voice_clone_ref_code", None)
++            _vc_xvec = kwargs.pop("voice_clone_x_vector_only_mode", None)
++            _vc_icl = kwargs.pop("voice_clone_icl_mode", None)
++            _vc_ref_text = kwargs.pop("voice_clone_ref_text", None)
++
++            def _unwrap_bool(x, default=False):
++                if x is None: return default
++                return bool(x[0]) if isinstance(x, list) and x else bool(x)
++            def _unwrap_str(x):
++                if x is None: return None
++                return str(x[0]) if isinstance(x, list) and x else str(x)
++
++            vc_xvec = _unwrap_bool(_vc_xvec, default=False)
++            vc_icl = _unwrap_bool(_vc_icl, default=(not vc_xvec))
++            vc_ref_text = _unwrap_str(_vc_ref_text)
++
++            if vc_code is None:
++                vc_xvec, vc_icl = True, False
++
++            voice_clone_prompt = [
++                VoiceClonePromptItem(
++                    ref_code=None if vc_xvec else vc_code,
++                    ref_spk_embedding=vc_spk,
++                    x_vector_only_mode=bool(vc_xvec),
++                    icl_mode=bool(vc_icl),
++                    ref_text=vc_ref_text,
++                )
++            ]
++            ref_audio = None
++            ref_text = vc_ref_text
++            x_vector_only_mode = bool(vc_xvec)
++
+         texts = self._ensure_list(text)
+         languages = (
+             self._ensure_list(language)

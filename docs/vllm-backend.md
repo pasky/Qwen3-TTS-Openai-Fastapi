@@ -54,6 +54,14 @@ If you use `uv`:
 uv sync --extra api --extra vllm
 ```
 
+3. **Apply required patches** to the installed `vllm-omni` package:
+
+```bash
+uv run python patches/apply.py
+```
+
+See [Required Patches](#required-patches) below for details.
+
 ## Configuration
 
 ### Environment Variables
@@ -232,6 +240,58 @@ response = client.audio.speech.create(
     language="Spanish"  # via extended schema
 )
 ```
+
+## Required Patches
+
+The vLLM-Omni backend requires small patches to the installed `vllm-omni`
+package. These are tracked as unified diff files in `patches/` and applied
+directly to the files inside your virtualenv's `site-packages`.
+
+### Why patches are needed
+
+`vllm-omni==0.14.0` has two issues that affect this project:
+
+1. **`forward()` dict mutation** — `Qwen3TTSModelForGeneration.forward()` calls
+   `.pop()` on the shared `runtime_additional_information` dict, mutating
+   per-request state that may be referenced across iterations. The fix is a
+   one-line shallow copy before the `.pop()` calls.
+
+2. **Voice-clone IPC serialisation** — vLLM-Omni uses msgpack to serialise
+   `additional_information` between the API process and GPU worker processes.
+   Nested torch tensors inside list/dict payloads are not reliably
+   reconstructed on the worker side. For `CUSTOM_VOICE`, this project sends
+   precomputed voice-clone conditioning tensors as top-level
+   `additional_information` keys. The patch adds support for these flattened
+   keys in `generate_voice_clone()`, reconstructing a `VoiceClonePromptItem`
+   on the worker side.
+
+### Applying patches
+
+```bash
+# Apply all patches (idempotent — safe to run multiple times)
+uv run python patches/apply.py
+
+# Check whether patches are applied without modifying anything
+uv run python patches/apply.py --check
+```
+
+> **Important:** Patches must be re-applied after every `uv sync` or
+> `pip install` that reinstalls `vllm-omni`, since those operations replace
+> the patched files with fresh copies.
+
+### Patch files
+
+| File | Target package | Description |
+|------|---------------|-------------|
+| `patches/vllm_omni_qwen3_tts.patch` | `vllm-omni==0.14.0` | Dict mutation fix + voice-clone IPC support |
+
+### Adding new patches
+
+1. Copy the original file from `site-packages` to `/tmp/original.py`
+2. Make your changes in a copy at `/tmp/patched.py`
+3. Generate a diff: `diff -u /tmp/original.py /tmp/patched.py > patches/my_fix.patch`
+4. Edit the patch header paths to be relative to `site-packages`
+5. Register the patch in `PATCH_TARGETS` inside `patches/apply.py`
 
 ## Troubleshooting
 

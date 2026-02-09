@@ -258,10 +258,11 @@ python -m api.main
 export TTS_BACKEND=vllm_omni
 export TTS_WARMUP_ON_START=true
 pip install -e ".[vllm]"  # Install vLLM first
+python patches/apply.py   # Apply required patches to vllm-omni
 python -m api.main
 ```
 
-For detailed vLLM-Omni setup and configuration, see [docs/vllm-backend.md](docs/vllm-backend.md).
+For detailed vLLM-Omni setup and configuration, see [docs/vllm-backend.md](docs/vllm-backend.md) (including [required patches](docs/vllm-backend.md#required-patches)).
 
 ### Option 2: Using Docker (GPU-Enabled)
 

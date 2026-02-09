@@ -1,5 +1,9 @@
-"""Runtime patches for third-party libraries.
+"""Tracked patches for third-party packages.
 
-These patches are applied via sitecustomize.py so they affect both the API
-process and vLLM-Omni worker subprocesses.
+Patch files (.patch) are applied to installed site-packages after `uv sync`:
+
+    uv run python patches/apply.py          # apply all patches
+    uv run python patches/apply.py --check  # verify patch status
+
+See each .patch file for details on what it fixes and why.
 """
