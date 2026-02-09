@@ -15,6 +15,8 @@
 # limitations under the License.
 import base64
 import io
+import logging
+import time
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union
@@ -35,6 +37,8 @@ AudioLike = Union[
 ]
 
 MaybeList = Union[Any, List[Any]]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -604,6 +608,9 @@ class Qwen3TTSModel:
                 "does not support generate_voice_clone, Please check Model Card or Readme for more details."
             )
         
+        t0_total = time.perf_counter()
+
+        t0_prepare = time.perf_counter()
         texts = self._ensure_list(text)
         languages = self._ensure_list(language) if isinstance(language, list) else ([language] * len(texts) if language is not None else ["Auto"] * len(texts))
         if len(languages) == 1 and len(texts) > 1:
@@ -635,7 +642,9 @@ class Qwen3TTSModel:
             else:
                 voice_clone_prompt_dict = voice_clone_prompt
                 ref_texts_for_ids = None
+        prepare_ms = (time.perf_counter() - t0_prepare) * 1000
 
+        t0_tokenize = time.perf_counter()
         input_texts = [self._build_assistant_text(t) for t in texts]
         input_ids = self._tokenize_texts(input_texts)
 
@@ -648,7 +657,9 @@ class Qwen3TTSModel:
                 else:
                     ref_tok = self._tokenize_texts([self._build_ref_text(rt)])[0]
                     ref_ids.append(ref_tok)
+        tokenize_ms = (time.perf_counter() - t0_tokenize) * 1000
 
+        t0_generate = time.perf_counter()
         gen_kwargs = self._merge_generate_kwargs(**kwargs)
 
         talker_codes_list, _ = self.model.generate(
@@ -659,7 +670,9 @@ class Qwen3TTSModel:
             non_streaming_mode=non_streaming_mode,
             **gen_kwargs,
         )
+        generate_ms = (time.perf_counter() - t0_generate) * 1000
 
+        t0_decode = time.perf_counter()
         codes_for_decode = []
         for i, codes in enumerate(talker_codes_list):
             ref_code_list = voice_clone_prompt_dict.get("ref_code", None)
@@ -669,7 +682,9 @@ class Qwen3TTSModel:
                 codes_for_decode.append(codes)
 
         wavs_all, fs = self.model.speech_tokenizer.decode([{"audio_codes": c} for c in codes_for_decode])
+        decode_ms = (time.perf_counter() - t0_decode) * 1000
 
+        t0_post = time.perf_counter()
         wavs_out: List[np.ndarray] = []
         for i, wav in enumerate(wavs_all):
             ref_code_list = voice_clone_prompt_dict.get("ref_code", None)
@@ -680,6 +695,19 @@ class Qwen3TTSModel:
                 wavs_out.append(wav[cut:])
             else:
                 wavs_out.append(wav)
+        post_ms = (time.perf_counter() - t0_post) * 1000
+
+        total_ms = (time.perf_counter() - t0_total) * 1000
+        logger.info(
+            "Core timing | path=generate_voice_clone batch=%d prepare_ms=%.1f tokenize_ms=%.1f generate_ms=%.1f decode_ms=%.1f post_ms=%.1f total_ms=%.1f",
+            len(texts),
+            prepare_ms,
+            tokenize_ms,
+            generate_ms,
+            decode_ms,
+            post_ms,
+            total_ms,
+        )
 
         return wavs_out, fs
 

@@ -93,6 +93,7 @@ MODEL_MAPPING = {
     "tts-1": "qwen3-tts",
     "tts-1-hd": "qwen3-tts",
     "qwen3-tts": "qwen3-tts",
+    "tts-qwen3": "qwen3-tts",
 }
 
 # Add language-specific model mappings
@@ -217,9 +218,13 @@ async def create_speech(
         )
     
     try:
+        req_t0 = time.perf_counter()
+
         # Normalize input text
+        norm_t0 = time.perf_counter()
         normalized_text = normalize_text(request.input, request.normalization_options)
-        
+        norm_ms = (time.perf_counter() - norm_t0) * 1000
+
         if not normalized_text.strip():
             raise HTTPException(
                 status_code=400,
@@ -229,12 +234,13 @@ async def create_speech(
                     "type": "invalid_request_error",
                 },
             )
-        
+
         # Extract language from model name if present, otherwise use request language
         model_language = extract_language_from_model(request.model)
         language = model_language if model_language else (request.language or "Auto")
-        
+
         # Generate speech
+        gen_t0 = time.perf_counter()
         audio, sample_rate = await generate_speech(
             text=normalized_text,
             voice=request.voice,
@@ -242,13 +248,34 @@ async def create_speech(
             instruct=request.instruct,
             speed=request.speed,
         )
-        
+        gen_ms = (time.perf_counter() - gen_t0) * 1000
+
         # Encode audio to requested format
+        enc_t0 = time.perf_counter()
         audio_bytes = encode_audio(audio, request.response_format, sample_rate)
-        
+        enc_ms = (time.perf_counter() - enc_t0) * 1000
+
+        total_ms = (time.perf_counter() - req_t0) * 1000
+
+        logger.info(
+            "TTS timing | model=%s voice=%s lang=%s fmt=%s speed=%.2f input_chars=%d norm_chars=%d "
+            "normalize_ms=%.1f generate_ms=%.1f encode_ms=%.1f total_ms=%.1f",
+            request.model,
+            request.voice,
+            language,
+            request.response_format,
+            request.speed,
+            len(request.input),
+            len(normalized_text),
+            norm_ms,
+            gen_ms,
+            enc_ms,
+            total_ms,
+        )
+
         # Get content type
         content_type = get_content_type(request.response_format)
-        
+
         # Return audio response
         return Response(
             content=audio_bytes,
@@ -258,7 +285,7 @@ async def create_speech(
                 "Cache-Control": "no-cache",
             },
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

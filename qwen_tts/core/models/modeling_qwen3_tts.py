@@ -2519,6 +2519,10 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
         repetition_penalty: float = 1.05,
         **kwargs,
     ):
+        import time as _time
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
+
         talker_kwargs = {
             "max_new_tokens": max_new_tokens,
             "min_new_tokens": 2,
@@ -2544,6 +2548,7 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
         }
 
         # Build talker inputs using shared method
+        _t0_build = _time.perf_counter()
         talker_input_embeds, talker_attention_mask, trailing_text_hiddens, tts_pad_embed = \
             self._build_talker_inputs(
                 input_ids=input_ids,
@@ -2554,8 +2559,10 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
                 speakers=speakers,
                 non_streaming_mode=non_streaming_mode,
             )
+        _build_ms = (_time.perf_counter() - _t0_build) * 1000
 
         # forward
+        _t0_talker = _time.perf_counter()
         talker_result = self.talker.generate(
             inputs_embeds=talker_input_embeds,
             attention_mask=talker_attention_mask,
@@ -2563,7 +2570,10 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
             tts_pad_embed=tts_pad_embed,
             **talker_kwargs,
         )
+        torch.cuda.synchronize()
+        _talker_ms = (_time.perf_counter() - _t0_talker) * 1000
 
+        _t0_post = _time.perf_counter()
         talker_codes = torch.stack([hid[-1] for hid in talker_result.hidden_states if hid[-1] is not None], dim=1)
         talker_hidden_states = torch.cat([hid[0][-1][:, -1:] for hid in talker_result.hidden_states], dim=1)[:, :-1]
         
@@ -2575,7 +2585,16 @@ class Qwen3TTSForConditionalGeneration(Qwen3TTSPreTrainedModel, GenerationMixin)
         
         talker_codes_list = [talker_codes[i, :length, ] for i, length in enumerate(effective_lengths)]
         talker_hidden_states_list = [talker_hidden_states[i, :length, :] for i, length in enumerate(effective_lengths)]
-        
+        _post_ms = (_time.perf_counter() - _t0_post) * 1000
+
+        _n_codes = talker_codes_list[0].shape[0] if talker_codes_list else 0
+        _logger.info(
+            "Model.generate timing | build_inputs_ms=%.1f talker_generate_ms=%.1f postprocess_ms=%.1f "
+            "generated_codes=%d input_embed_shape=%s",
+            _build_ms, _talker_ms, _post_ms, _n_codes,
+            list(talker_input_embeds.shape),
+        )
+
         return talker_codes_list, talker_hidden_states_list
 
     @torch.inference_mode()

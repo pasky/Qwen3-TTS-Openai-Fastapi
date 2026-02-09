@@ -10,6 +10,7 @@ from the qwen_tts package.
 import logging
 import os
 import pickle
+import time
 from typing import Optional, Tuple, List, Dict, Any
 import numpy as np
 
@@ -196,7 +197,11 @@ class OfficialQwen3TTSBackend(TTSBackend):
             await self.initialize()
         
         try:
+            t0_total = time.perf_counter()
+
+            t0_prep = time.perf_counter()
             voice_key = voice.lower()
+            prompt_items = None
             if voice_key == "custom":
                 if not self.supports_voice_cloning():
                     raise RuntimeError(
@@ -204,6 +209,10 @@ class OfficialQwen3TTSBackend(TTSBackend):
                         "Set TTS_MODEL_NAME accordingly."
                     )
                 prompt_items = self._load_custom_voice_prompt()
+            prep_ms = (time.perf_counter() - t0_prep) * 1000
+
+            t0_model = time.perf_counter()
+            if voice_key == "custom":
                 wavs, sr = self.model.generate_voice_clone(
                     text=text,
                     language=language,
@@ -217,17 +226,34 @@ class OfficialQwen3TTSBackend(TTSBackend):
                     speaker=voice,
                     instruct=instruct,
                 )
-            
+            model_ms = (time.perf_counter() - t0_model) * 1000
+
+            t0_post = time.perf_counter()
             audio = wavs[0]
-            
+
             # Apply speed adjustment if needed
             if speed != 1.0 and LIBROSA_AVAILABLE:
                 audio = librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
             elif speed != 1.0:
                 logger.warning("Speed adjustment requested but librosa not available")
-            
+            post_ms = (time.perf_counter() - t0_post) * 1000
+
+            total_ms = (time.perf_counter() - t0_total) * 1000
+            logger.info(
+                "Backend timing | backend=official device=%s voice=%s lang=%s speed=%.2f text_chars=%d prep_ms=%.1f model_ms=%.1f post_ms=%.1f total_ms=%.1f",
+                self.device,
+                voice,
+                language,
+                speed,
+                len(text),
+                prep_ms,
+                model_ms,
+                post_ms,
+                total_ms,
+            )
+
             return audio, sr
-            
+
         except Exception as e:
             logger.error(f"Speech generation failed: {e}")
             raise RuntimeError(f"Speech generation failed: {e}")
