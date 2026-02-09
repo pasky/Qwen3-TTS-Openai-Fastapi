@@ -36,16 +36,22 @@ docker-compose --profile vllm up qwen3-tts-vllm
 pip install -e .
 ```
 
-2. Install vLLM (requires CUDA):
+2. Install vLLM **and vLLM-Omni** (requires CUDA):
 
 ```bash
-pip install vllm>=0.4.0
+pip install vllm>=0.4.0 vllm-omni
 ```
 
-Or install with the vllm extras:
+Or install with the vllm extras (recommended):
 
 ```bash
 pip install -e ".[vllm]"
+```
+
+If you use `uv`:
+
+```bash
+uv sync --extra api --extra vllm
 ```
 
 ## Configuration

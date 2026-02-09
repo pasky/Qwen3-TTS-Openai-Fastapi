@@ -43,7 +43,10 @@ api = [
   "httpx>=0.24.0",
 ]
 vllm = [
+  # NOTE: vLLM-Omni is packaged separately as `vllm-omni` (import name: `vllm_omni`).
+  # Install this extra to use TTS_BACKEND=vllm_omni.
   "vllm>=0.4.0",
+  "vllm-omni",
 ]
 dev = [
   "pytest>=7.0.0",
