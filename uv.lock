@@ -206,7 +206,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.77.0"
+version = "0.71.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -218,9 +218,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/85/6cb5da3cf91de2eeea89726316e8c5c8c31e2d61ee7cb1233d7e95512c31/anthropic-0.77.0.tar.gz", hash = "sha256:ce36efeb80cb1e25430a88440dc0f9aa5c87f10d080ab70a1bdfd5c2c5fbedb4", size = 504575, upload-time = "2026-01-29T18:20:41.507Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/4f/70682b068d897841f43223df82d96ec1d617435a8b759c4a2d901a50158b/anthropic-0.71.0.tar.gz", hash = "sha256:eb8e6fa86d049061b3ef26eb4cbae0174ebbff21affa6de7b3098da857d8de6a", size = 489102, upload-time = "2025-10-16T15:54:40.08Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/27/9df785d3f94df9ac72f43ee9e14b8120b37d992b18f4952774ed46145022/anthropic-0.77.0-py3-none-any.whl", hash = "sha256:65cc83a3c82ce622d5c677d0d7706c77d29dc83958c6b10286e12fda6ffb2651", size = 397867, upload-time = "2026-01-29T18:20:39.481Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/77/073e8ac488f335aec7001952825275582fb8f433737e90f24eeef9d878f6/anthropic-0.71.0-py3-none-any.whl", hash = "sha256:85c5015fcdbdc728390f11b17642a65a4365d03b12b799b18b6cc57e71fdb327", size = 355035, upload-time = "2025-10-16T15:54:38.238Z" },
 ]
 
 [[package]]
@@ -1346,7 +1346,7 @@ wheels = [
 
 [[package]]
 name = "flashinfer-python"
-version = "0.6.1"
+version = "0.5.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "apache-tvm-ffi" },
@@ -1363,9 +1363,9 @@ dependencies = [
     { name = "torch" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/81/5a84e14df7358d2c2903b18c6f2779bd4b4a6739076d01a847d4c18fb102/flashinfer_python-0.6.1.tar.gz", hash = "sha256:8dc2fc5dc187fc70151d5f39ef560fde8a38117a4f6cf40dce0ddb09cbd4f0bf", size = 5141191, upload-time = "2026-01-14T05:40:27.825Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/91/cca69baeff24bb3efd12c7479a026432c8717ee47193694010494c528b22/flashinfer_python-0.5.3.tar.gz", hash = "sha256:100d59b0ede47878d2808cd3a1b9039d7a952d66338bc9f68dac192ae1b2e3f1", size = 4682367, upload-time = "2025-11-20T21:22:46.976Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/d5/bca632bb5781689415186421bbee2ad39ae8a39b0996d579c76901e5c66f/flashinfer_python-0.6.1-py3-none-any.whl", hash = "sha256:610dd4ac15e7a0874b79e7577d027cb35133e8dc31dc3137c2f2d6497fe46f18", size = 7580432, upload-time = "2026-01-14T05:40:25.636Z" },
+    { url = "https://files.pythonhosted.org/packages/76/78/6dc7e7da8cb87c9965644ea0d2439457a1bc9256c45ceda0044595be4143/flashinfer_python-0.5.3-py3-none-any.whl", hash = "sha256:b601293b72f9138bad173edc28df84b9f239a013be974e2e79d4ba98aeb38cf5", size = 6998069, upload-time = "2025-11-20T21:22:45.104Z" },
 ]
 
 [[package]]
@@ -4434,8 +4434,8 @@ requires-dist = [
     { name = "torchaudio" },
     { name = "transformers", specifier = "==4.57.3" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.27.0" },
-    { name = "vllm", marker = "extra == 'vllm'", specifier = ">=0.4.0" },
-    { name = "vllm-omni", marker = "extra == 'vllm'" },
+    { name = "vllm", marker = "extra == 'vllm'", specifier = "==0.14.1" },
+    { name = "vllm-omni", marker = "extra == 'vllm'", specifier = "==0.14.0" },
 ]
 provides-extras = ["api", "vllm", "dev"]
 
@@ -6093,7 +6093,7 @@ wheels = [
 
 [[package]]
 name = "vllm"
-version = "0.15.0"
+version = "0.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -6157,9 +6157,10 @@ dependencies = [
     { name = "watchfiles" },
     { name = "xgrammar", marker = "platform_machine == 'aarch64' or platform_machine == 'arm64' or platform_machine == 'ppc64le' or platform_machine == 's390x' or platform_machine == 'x86_64'" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/f0/67/ecb9458e58658b0ff47d6342265c3d46d7ba952c59bcffe50f19823be445/vllm-0.14.1.tar.gz", hash = "sha256:c7c6d0a729d29e70ac10baacbc7186930da24f8ae34f60451330527ff0be84ac", size = 19698767, upload-time = "2026-01-24T21:06:16.802Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/11/2bee2d1eb804d1be759b5d109772e95c04dd5f6c606e1f0b8f4444f7fd2a/vllm-0.15.0-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:faa6d7bc5f65b1b6f8b1e6a028759f78246113294fbc7e6633d25459d652d2a7", size = 461337080, upload-time = "2026-01-29T18:59:48.245Z" },
-    { url = "https://files.pythonhosted.org/packages/1b/d7/ad7b5703fea63b76300d3fff1c2a1f32140d51570fe35f2171af397a1b4c/vllm-0.15.0-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:fd03371687568c511be2f9204932b3d76fd432ccaf4c19632cd53e98b0eb53c8", size = 509194343, upload-time = "2026-01-29T19:00:21.286Z" },
+    { url = "https://files.pythonhosted.org/packages/16/e2/4e86761fda708d894a9d074cd1f9a1bb70f4236dfbb6c3ea0106f0048253/vllm-0.14.1-cp38-abi3-manylinux_2_31_aarch64.whl", hash = "sha256:3b77b9daece63d8c9837ccc512c367ead1d142bf9965a3d4e1fbf158d7a56b85", size = 448041824, upload-time = "2026-01-24T21:05:42.083Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/ee/17d0727901b9e9c25a8a1d24e87fb0bb22d1da960e9b6e10ebcba4c671ec/vllm-0.14.1-cp38-abi3-manylinux_2_31_x86_64.whl", hash = "sha256:435565a8299a5fcdbf5af4a798e342ddeec3f90df83c8227cc204bdebca19494", size = 495378590, upload-time = "2026-01-24T21:05:18.239Z" },
 ]
 
 [[package]]

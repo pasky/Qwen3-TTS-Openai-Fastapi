@@ -45,8 +45,10 @@ api = [
 vllm = [
   # NOTE: vLLM-Omni is packaged separately as `vllm-omni` (import name: `vllm_omni`).
   # Install this extra to use TTS_BACKEND=vllm_omni.
-  "vllm>=0.4.0",
-  "vllm-omni",
+  #
+  # IMPORTANT: vllm-omni 0.14.x is only compatible with vLLM 0.14.x.
+  "vllm==0.14.1",
+  "vllm-omni==0.14.0",
 ]
 dev = [
   "pytest>=7.0.0",
