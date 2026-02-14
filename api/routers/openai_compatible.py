@@ -26,6 +26,7 @@ from ..structures.schemas import (
 )
 from ..services.text_processing import normalize_text
 from ..services.audio_encoding import encode_audio, get_content_type, DEFAULT_SAMPLE_RATE
+from ..services.speech_batcher import submit_speech_request
 
 logger = logging.getLogger(__name__)
 
@@ -175,23 +176,21 @@ async def generate_speech(
     Returns:
         Tuple of (audio_array, sample_rate)
     """
-    backend = await get_tts_backend()
-    
     # Map voice name
     voice_name = get_voice_name(voice)
-    
-    # Generate speech using the backend
+
+    # Generate speech via automatic request batcher
     try:
-        audio, sr = await backend.generate_speech(
+        audio, sr = await submit_speech_request(
             text=text,
             voice=voice_name,
             language=language,
             instruct=instruct,
             speed=speed,
         )
-        
+
         return audio, sr
-        
+
     except Exception as e:
         raise RuntimeError(f"Speech generation failed: {e}")
 

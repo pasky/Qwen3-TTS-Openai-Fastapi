@@ -124,6 +124,30 @@ Recommended: true for production to initialize torch.compile() and cuDNN.
 """
 
 # ============================================================================
+# Request Batching Settings (/v1/audio/speech)
+# ============================================================================
+
+SPEECH_BATCH_ENABLED = os.getenv("SPEECH_BATCH_ENABLED", "true").lower() == "true"
+"""
+Enable automatic request batching for /v1/audio/speech.
+"""
+
+SPEECH_BATCH_DEBOUNCE_MS = int(os.getenv("SPEECH_BATCH_DEBOUNCE_MS", "200"))
+"""
+Debounce window for collecting parallel requests into one batch.
+"""
+
+SPEECH_BATCH_MAX_SIZE = int(os.getenv("SPEECH_BATCH_MAX_SIZE", "4"))
+"""
+Maximum number of requests per inference batch.
+"""
+
+SPEECH_BATCH_MAX_QUEUE = int(os.getenv("SPEECH_BATCH_MAX_QUEUE", "256"))
+"""
+Maximum queued speech requests waiting for batch worker.
+"""
+
+# ============================================================================
 # Intel Extension for PyTorch (IPEX) - Optional
 # ============================================================================
 

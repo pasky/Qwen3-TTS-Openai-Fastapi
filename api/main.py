@@ -99,6 +99,12 @@ async def lifespan(app: FastAPI):
     yield
     
     # Cleanup
+    try:
+        from .services.speech_batcher import shutdown_speech_batcher
+        await shutdown_speech_batcher()
+    except Exception as e:
+        logger.warning(f"Failed to shutdown speech batcher cleanly: {e}")
+
     logger.info("Server shutting down...")
 
 

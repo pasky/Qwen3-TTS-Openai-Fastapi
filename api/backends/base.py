@@ -53,6 +53,36 @@ class TTSBackend(ABC):
             Tuple of (audio_array, sample_rate)
         """
         pass
+
+    async def generate_speech_batch(
+        self,
+        requests: List[Dict[str, Any]],
+    ) -> List[Tuple[np.ndarray, int]]:
+        """
+        Generate speech for multiple requests.
+
+        Backends can override this method to perform true batched inference.
+        The default implementation falls back to sequential single-request
+        generation to preserve compatibility.
+
+        Args:
+            requests: List of request dicts with keys compatible with
+                `generate_speech` (text, voice, language, instruct, speed)
+
+        Returns:
+            List of (audio_array, sample_rate) tuples in input order
+        """
+        results: List[Tuple[np.ndarray, int]] = []
+        for req in requests:
+            result = await self.generate_speech(
+                text=req["text"],
+                voice=req["voice"],
+                language=req.get("language", "Auto"),
+                instruct=req.get("instruct"),
+                speed=req.get("speed", 1.0),
+            )
+            results.append(result)
+        return results
     
     @abstractmethod
     def get_backend_name(self) -> str:

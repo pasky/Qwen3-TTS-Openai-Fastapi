@@ -172,6 +172,14 @@ class OfficialQwen3TTSBackend(TTSBackend):
         logger.info(f"Loaded CUSTOM_VOICE prompt from {custom_voice_path}")
         return self.custom_voice_prompt
 
+    def _apply_speed(self, audio: np.ndarray, speed: float) -> np.ndarray:
+        """Apply post-generation speed adjustment if requested."""
+        if speed != 1.0 and LIBROSA_AVAILABLE:
+            return librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
+        if speed != 1.0:
+            logger.warning("Speed adjustment requested but librosa not available")
+        return audio
+
     async def generate_speech(
         self,
         text: str,
@@ -232,10 +240,7 @@ class OfficialQwen3TTSBackend(TTSBackend):
             audio = wavs[0]
 
             # Apply speed adjustment if needed
-            if speed != 1.0 and LIBROSA_AVAILABLE:
-                audio = librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
-            elif speed != 1.0:
-                logger.warning("Speed adjustment requested but librosa not available")
+            audio = self._apply_speed(audio, speed)
             post_ms = (time.perf_counter() - t0_post) * 1000
 
             total_ms = (time.perf_counter() - t0_total) * 1000
@@ -257,6 +262,86 @@ class OfficialQwen3TTSBackend(TTSBackend):
         except Exception as e:
             logger.error(f"Speech generation failed: {e}")
             raise RuntimeError(f"Speech generation failed: {e}")
+
+    async def generate_speech_batch(
+        self,
+        requests: List[Dict[str, Any]],
+    ) -> List[Tuple[np.ndarray, int]]:
+        """Generate speech for multiple requests using true batched model calls when possible."""
+        if not requests:
+            return []
+
+        if not self._ready:
+            await self.initialize()
+
+        try:
+            results: List[Optional[Tuple[np.ndarray, int]]] = [None] * len(requests)
+            custom_indices: List[int] = []
+            normal_indices: List[int] = []
+
+            for i, req in enumerate(requests):
+                voice_key = str(req.get("voice", "")).lower()
+                if voice_key == "custom":
+                    custom_indices.append(i)
+                else:
+                    normal_indices.append(i)
+
+            # Batch normal custom-voice-model speaker synthesis.
+            if normal_indices:
+                texts = [requests[i]["text"] for i in normal_indices]
+                speakers = [requests[i]["voice"] for i in normal_indices]
+                languages = [requests[i].get("language", "Auto") for i in normal_indices]
+                instructs = [requests[i].get("instruct") for i in normal_indices]
+
+                wavs, sr = self.model.generate_custom_voice(
+                    text=texts,
+                    language=languages,
+                    speaker=speakers,
+                    instruct=instructs,
+                )
+
+                for local_idx, req_idx in enumerate(normal_indices):
+                    speed = float(requests[req_idx].get("speed", 1.0))
+                    audio = self._apply_speed(wavs[local_idx], speed)
+                    results[req_idx] = (audio, sr)
+
+            # Batch custom prompt voice cloning if requested.
+            if custom_indices:
+                if not self.supports_voice_cloning():
+                    raise RuntimeError(
+                        "CUSTOM_VOICE requires the Base model (Qwen3-TTS-12Hz-1.7B-Base). "
+                        "Set TTS_MODEL_NAME accordingly."
+                    )
+
+                prompt_items = self._load_custom_voice_prompt()
+                texts = [requests[i]["text"] for i in custom_indices]
+                languages = [requests[i].get("language", "Auto") for i in custom_indices]
+
+                # If the prompt file contains multiple items and does not match the current
+                # batch size, use the first prompt for all batched requests.
+                voice_clone_prompt = prompt_items
+                if isinstance(prompt_items, list) and len(prompt_items) not in (1, len(custom_indices)):
+                    voice_clone_prompt = [prompt_items[0]] * len(custom_indices)
+
+                wavs, sr = self.model.generate_voice_clone(
+                    text=texts,
+                    language=languages,
+                    voice_clone_prompt=voice_clone_prompt,
+                )
+
+                for local_idx, req_idx in enumerate(custom_indices):
+                    speed = float(requests[req_idx].get("speed", 1.0))
+                    audio = self._apply_speed(wavs[local_idx], speed)
+                    results[req_idx] = (audio, sr)
+
+            if any(item is None for item in results):
+                raise RuntimeError("Failed to generate all batched outputs")
+
+            return [item for item in results if item is not None]
+
+        except Exception as e:
+            logger.error(f"Batched speech generation failed: {e}")
+            raise RuntimeError(f"Batched speech generation failed: {e}")
     
     def get_backend_name(self) -> str:
         """Return the name of this backend."""

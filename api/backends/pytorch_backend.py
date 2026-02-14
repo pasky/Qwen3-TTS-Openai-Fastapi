@@ -158,6 +158,14 @@ class PyTorchCPUBackend(TTSBackend):
             logger.error(f"Failed to load CPU PyTorch backend: {e}")
             raise RuntimeError(f"Failed to initialize CPU PyTorch backend: {e}")
     
+    def _apply_speed(self, audio: np.ndarray, speed: float) -> np.ndarray:
+        """Apply post-generation speed adjustment if requested."""
+        if speed != 1.0 and LIBROSA_AVAILABLE:
+            return librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
+        if speed != 1.0:
+            logger.warning("Speed adjustment requested but librosa not available")
+        return audio
+
     async def generate_speech(
         self,
         text: str,
@@ -194,16 +202,49 @@ class PyTorchCPUBackend(TTSBackend):
             audio = wavs[0]
             
             # Apply speed adjustment if needed
-            if speed != 1.0 and LIBROSA_AVAILABLE:
-                audio = librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
-            elif speed != 1.0:
-                logger.warning("Speed adjustment requested but librosa not available")
+            audio = self._apply_speed(audio, speed)
             
             return audio, sr
             
         except Exception as e:
             logger.error(f"Speech generation failed: {e}")
             raise RuntimeError(f"Speech generation failed: {e}")
+
+    async def generate_speech_batch(
+        self,
+        requests: List[Dict[str, Any]],
+    ) -> List[Tuple[np.ndarray, int]]:
+        """Generate speech for multiple requests in one model call."""
+        if not requests:
+            return []
+
+        if not self._ready:
+            await self.initialize()
+
+        try:
+            texts = [req["text"] for req in requests]
+            speakers = [req["voice"] for req in requests]
+            languages = [req.get("language", "Auto") for req in requests]
+            instructs = [req.get("instruct") for req in requests]
+
+            wavs, sr = self.model.generate_custom_voice(
+                text=texts,
+                language=languages,
+                speaker=speakers,
+                instruct=instructs,
+            )
+
+            results: List[Tuple[np.ndarray, int]] = []
+            for idx, wav in enumerate(wavs):
+                speed = float(requests[idx].get("speed", 1.0))
+                audio = self._apply_speed(wav, speed)
+                results.append((audio, sr))
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Batched speech generation failed: {e}")
+            raise RuntimeError(f"Batched speech generation failed: {e}")
     
     def get_backend_name(self) -> str:
         """Return the name of this backend."""
@@ -326,10 +367,7 @@ class PyTorchCPUBackend(TTSBackend):
             audio = wavs[0]
             
             # Apply speed adjustment if needed
-            if speed != 1.0 and LIBROSA_AVAILABLE:
-                audio = librosa.effects.time_stretch(audio.astype(np.float32), rate=speed)
-            elif speed != 1.0:
-                logger.warning("Speed adjustment requested but librosa not available")
+            audio = self._apply_speed(audio, speed)
             
             return audio, sr
             
